@@ -1,5 +1,6 @@
 import multer from 'multer';
 import crypto from 'crypto';
+import fs from 'fs';
 import path from 'path';
 import {
   UPLOAD_ALLOWED_EXTENSIONS,
@@ -8,8 +9,15 @@ import {
   UPLOAD_MAX_BYTES,
 } from '../constants';
 
+const ensureUploadDir = (): void => {
+  fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+};
+
 const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, UPLOAD_DIR),
+  destination: (_req, _file, cb) => {
+    ensureUploadDir();
+    cb(null, UPLOAD_DIR);
+  },
   filename: (_req, file, cb) => {
     const token = crypto.randomBytes(16).toString('hex');
     cb(null, `card_${Date.now()}_${token}${path.extname(file.originalname).toLowerCase()}`);

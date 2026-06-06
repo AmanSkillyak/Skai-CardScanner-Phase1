@@ -1,4 +1,4 @@
-export const API_BASE_PATH = '/api';
+export const API_BASE_PATH = import.meta.env.VITE_API_BASE_URL || '/api';
 
 export const API_ENDPOINTS = {
   scans: '/scans',

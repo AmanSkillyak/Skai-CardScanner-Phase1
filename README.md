@@ -43,7 +43,7 @@ Skai CardScanner is a TypeScript full-stack app for scanning visiting cards, ext
 │   │   └── utils/
 │   ├── package.json
 │   └── vite.config.ts
-└── docs/
+└── legacy-docs/
 ```
 
 The canonical backend application lives in `backend/src/` and builds to `backend/dist/`.
@@ -68,6 +68,14 @@ GROQ_API_KEY=
 RATE_LIMIT_WINDOW_MS=60000
 RATE_LIMIT_MAX=60
 ```
+
+For frontend environment variables, copy `frontend/.env.example` only when you want to override the default local proxy.
+
+```env
+VITE_API_BASE_URL=http://localhost:5000/api
+```
+
+During local development, leaving `VITE_API_BASE_URL` unset is recommended. The frontend uses `/api` by default, and Vite proxies `/api` and `/uploads` to `http://localhost:5000`.
 
 ## Install
 
@@ -119,11 +127,92 @@ npm run build
 ```bash
 cd backend
 npm test
+npx tsc --noEmit
 npm run build
 
 cd ../frontend
 npm test
+npx tsc --noEmit
 npm run build
+```
+
+## Deployment
+
+Do not commit `.env` files or deployment secrets. Set production values in the Vercel and Render dashboards.
+
+### MongoDB Atlas
+
+Create a MongoDB Atlas cluster and database user, then use the Atlas connection string as `MONGODB_URI`.
+
+Required backend database value:
+
+```env
+MONGODB_URI=mongodb+srv://<username>:<password>@<cluster-host>/skai-cardscanner?retryWrites=true&w=majority
+```
+
+Atlas setup checklist:
+
+- Add the Render backend outbound IP range to Atlas Network Access, or use Atlas's `0.0.0.0/0` option only if that matches your security policy.
+- Use a database user with read/write access to the CardScanner database.
+- Keep the Atlas URI only in Render environment variables.
+
+### Render Backend
+
+Create a Render Web Service for the backend.
+
+Exact Render settings:
+
+| Setting | Value |
+| --- | --- |
+| Root Directory | `backend` |
+| Runtime | `Node` |
+| Build Command | `npm install && npm run build` |
+| Start Command | `npm start` |
+| Health Check Path | `/api/health` |
+
+Required Render environment variables:
+
+```env
+NODE_ENV=production
+MONGODB_URI=mongodb+srv://<username>:<password>@<cluster-host>/skai-cardscanner?retryWrites=true&w=majority
+CORS_ORIGIN=https://<your-vercel-app>.vercel.app
+OCR_PROVIDER=tesseract
+RATE_LIMIT_WINDOW_MS=60000
+RATE_LIMIT_MAX=60
+```
+
+Optional Render environment variable:
+
+```env
+GROQ_API_KEY=<set-in-render-dashboard-only>
+```
+
+Render provides `PORT` automatically. The backend reads `process.env.PORT`, so do not hardcode it.
+
+### Vercel Frontend
+
+Create a Vercel project for the frontend after the Render backend URL is available.
+
+Exact Vercel settings:
+
+| Setting | Value |
+| --- | --- |
+| Framework Preset | `Vite` |
+| Root Directory | `frontend` |
+| Install Command | `npm install` |
+| Build Command | `npm run build` |
+| Output Directory | `dist` |
+
+Required Vercel environment variable:
+
+```env
+VITE_API_BASE_URL=https://<your-render-service>.onrender.com/api
+```
+
+After Vercel gives you the production frontend URL, add that exact origin to Render's `CORS_ORIGIN`. For multiple allowed origins, use a comma-separated list:
+
+```env
+CORS_ORIGIN=https://<your-vercel-app>.vercel.app,https://<custom-domain>
 ```
 
 ## API Routes

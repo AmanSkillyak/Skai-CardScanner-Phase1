@@ -14,16 +14,35 @@ import { rejectUnsafeKeys } from './middleware/sanitize';
 
 export const app = express();
 
-const corsOrigins = (process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : LOCAL_CORS_ORIGINS)
-  .map(origin => origin.trim())
+const normalizeCorsOrigin = (origin: string): string => origin.trim().replace(/\/+$/, '');
+
+const configuredCorsOrigins = process.env.CORS_ORIGIN || process.env.CORS_ORIGINS;
+
+const corsOrigins = (configuredCorsOrigins ? configuredCorsOrigins.split(',') : LOCAL_CORS_ORIGINS)
+  .map(normalizeCorsOrigin)
   .filter(Boolean);
+
+const corsOriginMatches = (origin: string): boolean =>
+  corsOrigins.some(allowedOrigin => {
+    if (allowedOrigin === '*') return true;
+    if (!allowedOrigin.includes('*')) return allowedOrigin === origin;
+
+    const pattern = allowedOrigin
+      .split('*')
+      .map(part => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+      .join('.*');
+    return new RegExp(`^${pattern}$`).test(origin);
+  });
 
 app.use(cors({
   origin: (origin, cb) => {
-    if (!origin || corsOrigins.includes(origin)) {
+    const normalizedOrigin = origin ? normalizeCorsOrigin(origin) : '';
+
+    if (!normalizedOrigin || corsOriginMatches(normalizedOrigin)) {
       cb(null, true);
       return;
     }
+    console.warn(`CORS rejected origin: ${origin}`);
     cb(new Error('Not allowed by CORS'));
   },
 }));
